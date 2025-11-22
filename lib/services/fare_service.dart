@@ -1,5 +1,4 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:pasada_passenger_app/services/calendar_service.dart';
 import 'package:pasada_passenger_app/utils/map_utils.dart';
 
 /// Service to calculate fare based on distance in kilometers
@@ -27,27 +26,12 @@ class FareService {
     return originalFare * (1 - discountPercentage);
   }
 
-  /// Calculates discounted fare with holiday rule:
-  /// - If passenger is Student and the date is a PH holiday, no discount.
+  /// Calculates discounted fare (holiday rule removed - student discount always available)
   static Future<double> calculateDiscountedFareWithHoliday(
       double originalFare, String passengerType,
       {DateTime? date}) async {
-    if (passengerType.isEmpty || passengerType == 'None') {
-      return originalFare;
-    }
-
-    final DateTime now = date ?? DateTime.now();
-
-    if (passengerType.toLowerCase() == 'student') {
-      final bool isHoliday =
-          await CalendarService.instance.isPhilippineHoliday(now);
-      if (isHoliday) {
-        // No student discount on holidays
-        return originalFare;
-      }
-    }
-
-    return originalFare * (1 - discountPercentage);
+    // Simply use the regular discount calculation (no holiday check)
+    return calculateDiscountedFare(originalFare, passengerType);
   }
 
   /// Gets the discount amount for display purposes
@@ -58,22 +42,12 @@ class FareService {
     return originalFare * discountPercentage;
   }
 
-  /// Gets the discount amount for display considering holiday rule.
+  /// Gets the discount amount for display (holiday rule removed - student discount always available)
   static Future<double> getDiscountAmountWithHoliday(
       double originalFare, String passengerType,
       {DateTime? date}) async {
-    if (passengerType.isEmpty || passengerType == 'None') {
-      return 0.0;
-    }
-    final DateTime now = date ?? DateTime.now();
-    if (passengerType.toLowerCase() == 'student') {
-      final bool isHoliday =
-          await CalendarService.instance.isPhilippineHoliday(now);
-      if (isHoliday) {
-        return 0.0;
-      }
-    }
-    return originalFare * discountPercentage;
+    // Simply use the regular discount amount calculation (no holiday check)
+    return Future.value(getDiscountAmount(originalFare, passengerType));
   }
 
   /// Calculates fare between two coordinates by computing distance (in km) via map_utils

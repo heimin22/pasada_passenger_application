@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:pasada_passenger_app/location/selectedLocation.dart';
-import 'package:pasada_passenger_app/services/calendar_service.dart';
 import 'package:pasada_passenger_app/services/id_camera_service.dart';
 import 'package:pasada_passenger_app/widgets/refreshable_bottom_sheet.dart';
 
@@ -108,29 +107,17 @@ class DiscountSelectionDialog {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    // Discount options (holiday-aware)
-                    FutureBuilder<bool>(
-                      future: CalendarService.instance
-                          .isPhilippineHoliday(DateTime.now()),
-                      builder: (context, snapshot) {
-                        final bool isHoliday = snapshot.data == true;
-                        return Column(
-                          children: [
-                            ...discountOptions.map((option) {
-                              return ValueListenableBuilder<String>(
-                                valueListenable: selectedDiscountSpecification,
-                                builder: (context, currentValue, _) {
-                                  final isSelected =
-                                      currentValue == option['value'];
-                                  final bool isStudentOption =
-                                      (option['value'] ?? '').toLowerCase() ==
-                                          'student';
-                                  final bool isDisabled =
-                                      isHoliday && isStudentOption;
-                                  return InkWell(
-                                    onTap: isDisabled
-                                        ? null
-                                        : () async {
+                    // Discount options
+                    Column(
+                      children: [
+                        ...discountOptions.map((option) {
+                          return ValueListenableBuilder<String>(
+                            valueListenable: selectedDiscountSpecification,
+                            builder: (context, currentValue, _) {
+                              final isSelected =
+                                  currentValue == option['value'];
+                              return InkWell(
+                                onTap: () async {
                                             final discountType =
                                                 option['value']!;
 
@@ -185,15 +172,13 @@ class DiscountSelectionDialog {
                                       option: option,
                                       isSelected: isSelected,
                                       isDarkMode: isDarkMode,
-                                      isDisabled: isDisabled,
+                                      isDisabled: false,
                                     ),
                                   );
                                 },
                               );
                             }),
-                          ],
-                        );
-                      },
+                      ],
                     ),
                   ],
                 ),

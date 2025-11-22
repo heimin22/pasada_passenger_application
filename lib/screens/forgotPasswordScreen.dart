@@ -49,24 +49,24 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
     final email = _emailController.text.trim().toLowerCase();
 
     if (email.isEmpty) {
-      Fluttertoast.showToast(
-        msg: "Please enter your email",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.CENTER,
-        backgroundColor: Color(0xFFF5F5F5),
-        textColor: Color(0xFF121212),
-      );
+        Fluttertoast.showToast(
+          msg: "Please enter your email",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.CENTER,
+          backgroundColor: const Color(0xFF121212),
+          textColor: const Color(0xFFF5F5F5),
+        );
       return;
     }
 
     if (!_canResend) {
-      Fluttertoast.showToast(
-        msg: "Please wait $_remainingTime seconds before requesting again",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Color(0xFFF5F5F5),
-        textColor: Color(0xFF121212),
-      );
+        Fluttertoast.showToast(
+          msg: "Please wait $_remainingTime seconds before requesting again",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: const Color(0xFF121212),
+          textColor: const Color(0xFFF5F5F5),
+        );
       return;
     }
 
@@ -129,22 +129,27 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5);
+    final textColor = isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212);
+    final borderColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFF121212);
+    
     Widget timerWidget = _canResend
         ? const SizedBox.shrink()
         : Text(
             'Resend in $_remainingTime seconds',
             style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color,
+              color: textColor,
             ),
           );
 
     return Scaffold(
-      backgroundColor: Color(0xFFF5F5F5),
+      backgroundColor: backgroundColor,
       appBar: AppBar(
-        backgroundColor: Color(0xFFF5F5F5),
+        backgroundColor: backgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF121212)),
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -153,46 +158,52 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Forgot Password",
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF121212),
+                color: textColor,
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               "Enter your email to reset your password",
               style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF121212),
+                color: textColor,
               ),
             ),
             const SizedBox(height: 24),
             TextField(
               controller: _emailController,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: Color(0xFF121212),
+                color: textColor,
                 fontWeight: FontWeight.w500,
                 fontFamily: 'Inter',
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: "Email",
                 hintStyle: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF121212),
+                  color: textColor.withOpacity(0.6),
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Inter',
                 ),
+                filled: true,
+                fillColor: isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
                 border: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF121212)),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  borderSide: BorderSide(color: borderColor),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: borderColor),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF121212)),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  borderSide: const BorderSide(color: Color(0xFF00CC58)),
+                  borderRadius: const BorderRadius.all(Radius.circular(8)),
                 ),
               ),
               keyboardType: TextInputType.emailAddress,
