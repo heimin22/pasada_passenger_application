@@ -38,76 +38,147 @@ class PaymentDetailsContainer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Title
           Text(
             'Payment Details',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
+              fontFamily: 'Inter',
               color: isDarkMode
                   ? const Color(0xFFF5F5F5)
                   : const Color(0xFF121212),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.payment,
-                    size: 24,
-                    color: const Color(0xFF00CC58),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    paymentMethod,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDarkMode
-                          ? const Color(0xFFF5F5F5)
-                          : const Color(0xFF121212),
-                    ),
-                  ),
-                ],
-              ),
-              Text(
-                '₱${fare.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (showCancelButton)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onCancelBooking,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF3B30),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text(
-                  'Cancel Booking',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFF5F5F5),
-                  ),
-                ),
+          const SizedBox(height: 20),
+
+          // Payment Method Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? const Color(0xFF2A2A2A)
+                  : const Color(0xFFF0FFF5),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF00CC58).withAlpha(0.3.toInt()),
               ),
             ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00CC58).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.payment_rounded,
+                    size: 24,
+                    color: Color(0xFF00CC58),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Payment Method',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          fontFamily: 'Inter',
+                          color: isDarkMode
+                              ? const Color(0xFFBBBBBB)
+                              : const Color(0xFF666666),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        paymentMethod,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter',
+                          color: isDarkMode
+                              ? const Color(0xFFF5F5F5)
+                              : const Color(0xFF121212),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Fare Section
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? const Color(0xFF2A2A2A)
+                  : const Color(0xFFE8F5E8),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF00CC58).withAlpha(0.3.toInt()),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00CC58).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        '₱',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: 'Inter',
+                          color: Color(0xFF00CC58),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Fare',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Inter',
+                            color: isDarkMode
+                                ? const Color(0xFFBBBBBB)
+                                : const Color(0xFF666666),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '₱${fare.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Inter',
+                            color: Color(0xFF00CC58),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

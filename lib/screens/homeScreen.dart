@@ -12,7 +12,6 @@ import 'package:pasada_passenger_app/screens/calendar_screen.dart';
 import 'package:pasada_passenger_app/screens/mapScreen.dart';
 import 'package:pasada_passenger_app/services/allowedStopsServices.dart';
 import 'package:pasada_passenger_app/services/bookingService.dart';
-import 'package:pasada_passenger_app/services/calendar_service.dart';
 import 'package:pasada_passenger_app/services/capacity_service.dart';
 import 'package:pasada_passenger_app/services/driverAssignmentService.dart';
 import 'package:pasada_passenger_app/services/error_logging_service.dart';
@@ -28,7 +27,6 @@ import 'package:pasada_passenger_app/widgets/alert_sequence_dialog.dart';
 import 'package:pasada_passenger_app/widgets/booking_confirmation_dialog.dart';
 import 'package:pasada_passenger_app/widgets/bounds_fab.dart';
 import 'package:pasada_passenger_app/widgets/discount_selection_dialog.dart';
-import 'package:pasada_passenger_app/widgets/holiday_banner.dart';
 import 'package:pasada_passenger_app/widgets/home_booking_sheet.dart';
 import 'package:pasada_passenger_app/widgets/home_bottom_section.dart';
 import 'package:pasada_passenger_app/widgets/home_header_section.dart';
@@ -145,7 +143,6 @@ class HomeScreenPageState extends State<HomeScreenStateful>
       false; // Notification disabled - route warning removed
   double notificationDragOffset = 0;
   final double notificationHeight = 60.0;
-  bool showHolidayBanner = false;
 
   double currentFare = 0.0;
   double originalFare = 0.0; // Store original fare before discount
@@ -161,7 +158,6 @@ class HomeScreenPageState extends State<HomeScreenStateful>
       ValueNotifier(null);
   final ValueNotifier<bool> _notificationVisibilityNotifier =
       ValueNotifier(false); // Notification disabled - route warning removed
-  final ValueNotifier<bool> _holidayBannerNotifier = ValueNotifier(false);
 
   // Combined notifier to reduce nested rebuilds
   late final ValueNotifier<_HomeBottomSectionState>
@@ -552,7 +548,6 @@ class HomeScreenPageState extends State<HomeScreenStateful>
     _paymentMethodNotifier.dispose();
     _routeNotifier.dispose();
     _notificationVisibilityNotifier.dispose();
-    _holidayBannerNotifier.dispose();
     _combinedBottomSectionNotifier.dispose();
 
     super.dispose();
@@ -658,31 +653,14 @@ class HomeScreenPageState extends State<HomeScreenStateful>
   // Method to update fare when discount changes
   void _updateFareForDiscount() async {
     if (!mounted) return;
-    final String discount = selectedDiscountSpecification.value;
-    // Update holiday banner visibility asynchronously
-    _updateHolidayBannerVisibility(discount);
 
-    // Use holiday-aware fare calculation
+    // Use holiday-aware fare calculation (now always applies discount)
     final discountedFare = await FareService.calculateDiscountedFareWithHoliday(
         originalFare, selectedDiscountSpecification.value);
 
     if (mounted) {
       currentFare = discountedFare;
       _fareNotifier.value = currentFare;
-    }
-  }
-
-  Future<void> _updateHolidayBannerVisibility(String discount) async {
-    if (discount.toLowerCase() == 'student') {
-      final bool isHoliday =
-          await CalendarService.instance.isPhilippineHoliday(DateTime.now());
-      if (!mounted) return;
-      showHolidayBanner = isHoliday;
-      _holidayBannerNotifier.value = isHoliday;
-    } else {
-      if (!mounted) return;
-      showHolidayBanner = false;
-      _holidayBannerNotifier.value = false;
     }
   }
 
@@ -913,20 +891,6 @@ class HomeScreenPageState extends State<HomeScreenStateful>
 
             return Stack(
               children: [
-                if (showHolidayBanner)
-                  Positioned(
-                    top: MediaQuery.of(context).padding.top + 10,
-                    left: responsivePadding,
-                    right: responsivePadding,
-                    child: HolidayBanner(
-                      message:
-                          'Holiday today: Student discounts are not available.',
-                      onClose: () {
-                        showHolidayBanner = false;
-                        _holidayBannerNotifier.value = false;
-                      },
-                    ),
-                  ),
                 MapScreen(
                   key: mapScreenKey,
                   pickUpLocation: selectedPickUpLocation?.coordinates,
@@ -963,8 +927,7 @@ class HomeScreenPageState extends State<HomeScreenStateful>
                   bookingStatus: bookingStatus,
                 ),
                 Positioned(
-                  top: (MediaQuery.of(context).padding.top + 10) +
-                      (showHolidayBanner ? 58 : 0),
+                  top: MediaQuery.of(context).padding.top + 10,
                   left: responsivePadding,
                   right: responsivePadding,
                   child: HomeHeaderSection(
@@ -1081,6 +1044,7 @@ class HomeScreenPageState extends State<HomeScreenStateful>
                     phoneNumber: phoneNumber,
                     isDriverAssigned: isDriverAssigned,
                     currentLocation: mapScreenKey.currentState?.currentLocation,
+                    driverLocation: (mapScreenKey.currentState as dynamic)?.driverLocation,
                     bookingId: activeBookingId,
                     selectedDiscount:
                         selectedDiscountSpecification.value.isNotEmpty &&

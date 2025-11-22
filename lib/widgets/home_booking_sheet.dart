@@ -19,6 +19,7 @@ class HomeBookingSheet extends StatelessWidget {
   final String phoneNumber;
   final bool isDriverAssigned;
   final LatLng? currentLocation;
+  final LatLng? driverLocation;
   final int? bookingId;
   final String? selectedDiscount;
   final String? capturedImagePath;
@@ -47,6 +48,7 @@ class HomeBookingSheet extends StatelessWidget {
     required this.phoneNumber,
     required this.isDriverAssigned,
     required this.currentLocation,
+    this.driverLocation,
     this.bookingId,
     this.selectedDiscount,
     this.capturedImagePath,
@@ -119,6 +121,7 @@ class HomeBookingSheet extends StatelessWidget {
                         isDriverAssigned: isDriverAssigned,
                         bookingStatus: bookingStatus,
                         currentLocation: currentLocation,
+                        driverLocation: driverLocation,
                         bookingId: bookingId,
                         selectedDiscount: selectedDiscount,
                         capturedImagePath: capturedImagePath,

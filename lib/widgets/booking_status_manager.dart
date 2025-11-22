@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../location/selectedLocation.dart';
+import '../utils/heading_calculator.dart';
 import 'booking_details_container.dart';
 import 'driver_details_container.dart';
 import 'driver_loading_container.dart';
 import 'driver_plate_number_container.dart';
 import 'eta_container.dart';
+import 'payment_details_container.dart';
 import 'skeleton.dart';
 import 'vehicle_capacity_container.dart';
 
@@ -25,6 +27,7 @@ class BookingStatusManager extends StatefulWidget {
   final bool isDriverAssigned;
   final String bookingStatus;
   final LatLng? currentLocation;
+  final LatLng? driverLocation;
   final int? bookingId;
   final String? selectedDiscount;
   final String? capturedImageUrl;
@@ -48,6 +51,7 @@ class BookingStatusManager extends StatefulWidget {
     required this.isDriverAssigned,
     this.bookingStatus = 'requested',
     this.currentLocation,
+    this.driverLocation,
     this.bookingId,
     this.selectedDiscount,
     this.capturedImageUrl,
@@ -69,6 +73,155 @@ class _BookingStatusManagerState extends State<BookingStatusManager> {
   final Duration _debounceDuration = const Duration(seconds: 1);
   Timer? _autoRefreshTimer;
   bool _isRefreshingCapacity = false;
+
+  /// Calculate distance between two points in meters using Haversine formula
+  double _calculateDistance(LatLng from, LatLng to) {
+    return HeadingCalculator.calculateDistance(from, to);
+  }
+
+  /// Show confirmation dialog before cancelling booking
+  void _showCancelConfirmationDialog(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext bottomSheetContext) {
+        return Container(
+          decoration: BoxDecoration(
+            color:
+                isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
+          ),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 24),
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? const Color(0xFF555555)
+                        : const Color(0xFFCCCCCC),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Sad emoji icon
+              const Text(
+                '😢',
+                style: TextStyle(
+                  fontSize: 64,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Title (centered)
+              Text(
+                'Sure ka na, boss?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w700,
+                  color: isDarkMode
+                      ? const Color(0xFFF5F5F5)
+                      : const Color(0xFF121212),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Subtitle (centered)
+              Text(
+                'Sige, okay lang naman po kung cacancel mo na. Malayo pa naman ata si driver e.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  fontFamily: 'Inter',
+                  color: isDarkMode
+                      ? const Color(0xFFBBBBBB)
+                      : const Color(0xFF666666),
+                ),
+              ),
+              const SizedBox(height: 32),
+              // Buttons
+              Row(
+                children: [
+                  // Cancel button (go back)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        side: BorderSide(
+                          color: isDarkMode
+                              ? const Color(0xFF555555)
+                              : const Color(0xFFCCCCCC),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(
+                        'Hindi na',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode
+                              ? const Color(0xFFF5F5F5)
+                              : const Color(0xFF121212),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Confirm cancel button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(bottomSheetContext);
+                        widget.onCancelBooking();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        backgroundColor: const Color(0xFFFF3B30),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        textStyle: const TextStyle(fontFamily: 'Inter'),
+                      ),
+                      child: const Text(
+                        'Oo, cancel na',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFFF5F5F5),
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void didUpdateWidget(covariant BookingStatusManager oldWidget) {
@@ -150,6 +303,7 @@ class _BookingStatusManagerState extends State<BookingStatusManager> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
+                    fontFamily: 'Inter',
                     color: isDarkMode
                         ? const Color(0xFFF5F5F5)
                         : const Color(0xFF121212),
@@ -302,6 +456,44 @@ class _BookingStatusManagerState extends State<BookingStatusManager> {
                 selectedDiscount: widget.selectedDiscount,
                 capturedImageUrl: widget.capturedImageUrl,
               ),
+              PaymentDetailsContainer(
+                paymentMethod: widget.paymentMethod,
+                fare: widget.fare,
+                onCancelBooking: widget.onCancelBooking,
+                showCancelButton: false,
+              ),
+              // Show cancel button when status is accepted and driver is 500m+ from pickup
+              if (widget.bookingStatus == 'accepted' &&
+                  widget.driverLocation != null &&
+                  widget.pickupLocation != null &&
+                  _calculateDistance(
+                        widget.driverLocation!,
+                        widget.pickupLocation!.coordinates,
+                      ) >=
+                      500.0)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 8.0, horizontal: 16.0),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      backgroundColor: const Color(0xFFFF3B30),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: () => _showCancelConfirmationDialog(context),
+                    child: const Text(
+                      'Cancel Booking',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFF5F5F5),
+                      ),
+                    ),
+                  ),
+                ),
             ] else if (widget.bookingStatus == 'cancelled')
               _buildCancelledStatusContent(isDarkMode),
           ],

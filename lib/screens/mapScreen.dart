@@ -591,6 +591,13 @@ class MapScreenState extends State<MapScreen>
       {double? heading}) async {
     if (!mounted) return;
 
+    // Don't update if ride is cancelled
+    if (rideStatus == 'cancelled') {
+      // Clear driver from map if cancelled
+      _clearDriverFromMap();
+      return;
+    }
+
     // Update driver location using stable state manager (prevents flickering)
     _stableStateManager.updateDriverLocation(location, rideStatus);
 
@@ -951,11 +958,39 @@ class MapScreenState extends State<MapScreen>
     }
   }
 
+  // Clears driver from map (used when cancelling)
+  void _clearDriverFromMap() {
+    if (!mounted) return;
+    setState(() {
+      driverLocation = null;
+      // Clear from all marker managers
+      _stableStateManager.removeDriverMarker();
+      _markerManager.removeDriverMarker();
+      _optimizedMarkerManager.removeMarker('driver');
+      // Clear driver route polylines by updating with cancelled status
+      _driverTracker.updateDriverLocation(
+        const LatLng(0, 0), // Dummy location
+        'cancelled',
+      );
+      // Clear directional bus marker by updating with cancelled status
+      _directionalBusManager.updateDriverPosition(
+        const LatLng(0, 0),
+        rideStatus: 'cancelled',
+      );
+      // Clear driver route polylines
+      _stableStateManager.removePolyline(const PolylineId('driver_route_live'));
+      _optimizedPolylineManager
+          .removePolyline(const PolylineId('driver_route_live'));
+    });
+    _requestCoalescedRebuild();
+  }
+
   // Clears all map overlays and selected locations
   void clearAll() {
     setState(() {
       selectedPickupLatLng = null;
       selectedDropOffLatLng = null;
+      driverLocation = null; // Clear driver location
       _routeManager.clearAllPolylines();
       _polylineStateManager.clearAllPolylines();
       _stableStateManager.clearAll();

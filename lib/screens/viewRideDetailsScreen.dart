@@ -686,27 +686,28 @@ class _ViewRideDetailsScreenState extends State<ViewRideDetailsScreen> {
                                         ? Colors.grey[300]
                                         : Colors.grey[700],
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.share_outlined,
-                                        size: 18),
-                                    onPressed: () {
-                                      final id = bookingDetails['booking_id'];
-                                      if (id != null) {
-                                        final url =
-                                            'https://pasadaapp.vercel.app/track/$id';
-                                        SharePlus.instance.share(
-                                          ShareParams(
-                                            text:
-                                                'Boss, ito yung link ng booking ko: $url',
-                                            subject: 'Track my Pasada booking',
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    color: isDarkMode
-                                        ? Colors.grey[300]
-                                        : Colors.grey[700],
-                                  ),
+                                  if (bookingDetails['ride_status'] != 'completed')
+                                    IconButton(
+                                      icon: const Icon(Icons.share_outlined,
+                                          size: 18),
+                                      onPressed: () {
+                                        final id = bookingDetails['booking_id'];
+                                        if (id != null) {
+                                          final url =
+                                              'https://pasadaapp.com/track/$id';
+                                          SharePlus.instance.share(
+                                            ShareParams(
+                                              text:
+                                                  'Boss, ito yung link ng booking ko: $url',
+                                              subject: 'Track my Pasada booking',
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      color: isDarkMode
+                                          ? Colors.grey[300]
+                                          : Colors.grey[700],
+                                    ),
                                 ],
                               ),
                             ],

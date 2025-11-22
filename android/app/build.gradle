@@ -23,7 +23,7 @@ def mapsApiKey = properties.getProperty("mapsApiKey", "")
 android {
     namespace = "com.example.pasada_passenger_app"
     compileSdkVersion 36
-    ndkVersion "27.0.12077973"
+    ndkVersion "29.0.14206865"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

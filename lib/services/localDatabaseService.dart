@@ -133,9 +133,9 @@ class LocalDatabaseService {
       if (count > 0) {
         debugPrint(
             'Updated status for local booking $bookingId to $newStatus.');
-      } else {
-        debugPrint("Local booking $bookingId not found for status update.");
       }
+      // Silently handle case where booking doesn't exist in local DB
+      // This is normal if booking was never saved locally or was already deleted
     } catch (e) {
       debugPrint("Error updating status for local booking $bookingId: $e");
     }

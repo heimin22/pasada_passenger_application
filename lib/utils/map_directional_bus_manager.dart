@@ -82,6 +82,15 @@ class MapDirectionalBusManager {
         tag: 'BusManager',
         throttle: true);
 
+    // If status is cancelled, remove the marker
+    if (rideStatus == 'cancelled') {
+      _markers.remove(MarkerId('driver'));
+      _currentPosition = null;
+      _lastRideStatus = rideStatus;
+      onStateChanged?.call();
+      return;
+    }
+
     if (_busIconDefault == null || _busIconHorizontal == null) {
       AppLogger.warn(
           'Bus icons not initialized - Default: ${_busIconDefault != null}, Horizontal: ${_busIconHorizontal != null}',

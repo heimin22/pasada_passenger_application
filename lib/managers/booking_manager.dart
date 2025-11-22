@@ -119,6 +119,10 @@ class BookingManager {
                 _state.driverAssignmentService?.stopPolling();
                 _state.bookingService?.stopLocationTracking();
                 await _stopBackgroundServiceForRide();
+                // Clear map state if cancelled
+                if (newStatus == 'cancelled') {
+                  _clearMapState();
+                }
                 await _handleRideCompletionNavigationAndCleanup();
                 return;
               }
@@ -415,6 +419,10 @@ class BookingManager {
                 _state.driverAssignmentService?.stopPolling();
                 _state.bookingService?.stopLocationTracking();
                 await _stopBackgroundServiceForRide();
+                // Clear map state if cancelled
+                if (newStatus == 'cancelled') {
+                  _clearMapState();
+                }
                 await _handleRideCompletionNavigationAndCleanup();
                 return;
               }
@@ -563,16 +571,16 @@ class BookingManager {
           ).then((_) => handleNoDriverFound());
         } else {
           // Other booking failures - clear everything
-          handleBookingCancellation();
+          await handleBookingCancellation();
         }
       }
     } else {
       Fluttertoast.showToast(msg: 'User or route missing.');
-      handleBookingCancellation();
+      await handleBookingCancellation();
     }
   }
 
-  void handleBookingCancellation() {
+  Future<void> handleBookingCancellation() async {
     _isCompleted = true; // Set flag to prevent any further API calls
     _acceptedNotified = false;
     _progressNotificationStarted = false;
@@ -584,16 +592,42 @@ class BookingManager {
 
     final currentBookingId = _state.activeBookingId;
 
-    SharedPreferences.getInstance().then((prefs) async {
-      if (currentBookingId != null) {
-        await LocalDatabaseService().deleteBookingDetails(currentBookingId);
+    // Clear map state first to remove driver markers/pins
+    _clearMapState();
+
+    // Update database to set ride_status to 'cancelled'
+    if (currentBookingId != null) {
+      try {
+        _state.bookingService ??= BookingService();
+        await _state.bookingService!
+            .updateBookingStatus(currentBookingId, 'cancelled');
+        debugPrint(
+            '[BookingManager] Updated booking $currentBookingId status to cancelled in database');
+      } catch (e) {
+        debugPrint(
+            '[BookingManager] Error updating booking status to cancelled: $e');
+        // Continue with cleanup even if database update fails
       }
-      await prefs.remove('activeBookingId');
-      await prefs.remove('pickup');
-      await prefs.remove('dropoff');
-    });
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    if (currentBookingId != null) {
+      await LocalDatabaseService().deleteBookingDetails(currentBookingId);
+    }
+    await prefs.remove('activeBookingId');
+    await prefs.remove('pickup');
+    await prefs.remove('dropoff');
 
     if (_state.mounted) {
+      // First set status to cancelled so UI can react
+      _state.setState(() {
+        _state.bookingStatus = 'cancelled';
+      });
+
+      // Clear map state again after status update to ensure driver is removed
+      _clearMapState();
+
+      // Then clear all state
       _state.setState(() {
         _state.isBookingConfirmed = false;
         _state.isDriverAssigned = false;
@@ -602,11 +636,21 @@ class BookingManager {
         _state.selectedDropOffLocation = null;
         _state.selectedRoute = null;
         _state.bookingStatus = ''; // Reset booking status
+        // Clear driver-related state
+        _state.driverName = '';
+        _state.plateNumber = '';
+        _state.phoneNumber = '';
+        _state.vehicleModel = '';
+        _state.vehicleTotalCapacity = null;
+        _state.vehicleSittingCapacity = null;
+        _state.vehicleStandingCapacity = null;
       });
       _state.bookingAnimationController.reverse();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_state.mounted) {
           _state.measureContainers();
+          // Final map clear to ensure everything is removed
+          _clearMapState();
         }
       });
     }
@@ -716,9 +760,13 @@ class BookingManager {
         }
       }
     }
-    if (driverLatLng != null) {
-      _state.mapScreenKey.currentState
-          ?.updateDriverLocation(driverLatLng, _state.bookingStatus);
+    if (driverLatLng != null && !_isCompleted) {
+      // Only update driver location if booking is not completed/cancelled
+      if (_state.bookingStatus != 'cancelled' &&
+          _state.bookingStatus != 'completed') {
+        _state.mapScreenKey.currentState
+            ?.updateDriverLocation(driverLatLng, _state.bookingStatus);
+      }
       // Update ride progress notification
       final dropoff = _state.selectedDropOffLocation?.coordinates;
       if (dropoff != null) {
@@ -922,6 +970,13 @@ class BookingManager {
   }
 
   Future<void> _loadBookingAfterDriverAssignment(int bookingId) async {
+    // Prevent loading if booking is already completed/cancelled
+    if (_isCompleted) {
+      debugPrint(
+          "[BookingManager] _loadBookingAfterDriverAssignment: Booking already completed/cancelled, skipping driver load for $bookingId");
+      return;
+    }
+
     // First, check if booking has a driver_id
     try {
       final bookingDetails =
@@ -931,8 +986,17 @@ class BookingManager {
             "[BookingManager] No driver_id in booking $bookingId yet, skipping driver load");
         return;
       }
+      // Check if booking is cancelled
+      if (bookingDetails['ride_status'] == 'cancelled') {
+        debugPrint(
+            "[BookingManager] Booking $bookingId is cancelled, skipping driver load");
+        _isCompleted = true;
+        return;
+      }
     } catch (e) {
       debugPrint("[BookingManager] Error checking booking for driver_id: $e");
+      // If error occurs, check if we should continue
+      if (_isCompleted) return;
     }
 
     // Try fetching full driver details (including current_location) via RPC
@@ -1058,13 +1122,38 @@ class BookingManager {
   }
 
   Future<void> _fetchDriverDetailsDirectlyFromDB(int bookingId) async {
+    // Prevent fetching if booking is already completed/cancelled
+    if (_isCompleted) {
+      debugPrint(
+          "[BookingManager] _fetchDriverDetailsDirectlyFromDB: Booking already completed/cancelled, skipping driver fetch for $bookingId");
+      return;
+    }
+
     try {
       final booking = await supabase
           .from('bookings')
-          .select('driver_id')
+          .select('driver_id, ride_status')
           .eq('booking_id', bookingId)
           .single();
-      if (!booking.containsKey('driver_id')) return;
+
+      // Check if booking is cancelled
+      if (booking['ride_status'] == 'cancelled') {
+        debugPrint(
+            "[BookingManager] _fetchDriverDetailsDirectlyFromDB: Booking $bookingId is cancelled, skipping driver fetch");
+        _isCompleted = true;
+        return;
+      }
+
+      if (!booking.containsKey('driver_id') || booking['driver_id'] == null) {
+        return;
+      }
+
+      // Double-check _isCompleted after async call
+      if (_isCompleted) {
+        debugPrint(
+            "[BookingManager] _fetchDriverDetailsDirectlyFromDB: Booking marked as completed during fetch, aborting");
+        return;
+      }
       final driverId = booking['driver_id'];
       final driver = await supabase
           .from('driverTable')
@@ -1193,6 +1282,19 @@ class BookingManager {
         if (details != null) {
           // quiet payload log
           final status = details['ride_status'];
+
+          // Stop polling if cancelled
+          if (status == 'cancelled' && !_isCompleted) {
+            _isCompleted = true;
+            timer.cancel();
+            _completionTimer = null;
+            _state.driverAssignmentService?.stopPolling();
+            _state.bookingService?.stopLocationTracking();
+            debugPrint(
+                '[BookingManager] _startCompletionPolling: Booking $bookingId is cancelled, stopping polling');
+            return;
+          }
+
           // If ride ongoing, update driver location & polyline
           if (status == 'ongoing' && !_isCompleted) {
             final driverDetails =
@@ -1321,12 +1423,26 @@ class BookingManager {
 
   // Public method to refresh driver details and vehicle capacity for a booking
   Future<void> refreshDriverAndCapacity(int bookingId) async {
+    // Prevent refresh if booking is already completed/cancelled
+    if (_isCompleted) {
+      debugPrint(
+          '[BookingManager] refreshDriverAndCapacity: Booking already completed/cancelled, skipping refresh for $bookingId');
+      return;
+    }
+
     try {
       debugPrint(
           '[BookingManager] refreshDriverAndCapacity: Starting refresh for booking $bookingId');
 
       // First, fetch fresh booking details
       await _fetchAndUpdateBookingDetails(bookingId);
+
+      // Check again after async call
+      if (_isCompleted) {
+        debugPrint(
+            '[BookingManager] refreshDriverAndCapacity: Booking marked as completed during refresh, aborting');
+        return;
+      }
 
       // Then fetch fresh driver and vehicle details
       await _loadBookingAfterDriverAssignment(bookingId);
@@ -1733,6 +1849,10 @@ class BookingManager {
                 _state.driverAssignmentService?.stopPolling();
                 _state.bookingService?.stopLocationTracking();
                 await _stopBackgroundServiceForRide();
+                // Clear map state if cancelled
+                if (newStatus == 'cancelled') {
+                  _clearMapState();
+                }
                 await _handleRideCompletionNavigationAndCleanup();
                 return;
               }
