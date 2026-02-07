@@ -7,7 +7,6 @@ import 'package:pasada_passenger_app/services/polyline_cache_service.dart';
 import 'package:pasada_passenger_app/services/route_service.dart';
 import 'package:pasada_passenger_app/services/traffic_service.dart';
 import 'package:pasada_passenger_app/widgets/alert_sequence_dialog.dart';
-import 'package:pasada_passenger_app/widgets/route_selection_widget.dart';
 import 'package:pasada_passenger_app/widgets/rush_hour_dialog.dart';
 import 'package:pasada_passenger_app/widgets/skeleton.dart';
 import 'package:pasada_passenger_app/widgets/traffic_insights_sheet.dart';
@@ -25,6 +24,17 @@ class _RouteSelectionState extends State<RouteSelection> {
   List<Map<String, dynamic>> _routes = [];
   List<Map<String, dynamic>> _filteredRoutes = [];
   bool _isLoading = true;
+
+  // Design constants
+  static const Color _primaryColor = Color(0xFF00CC58);
+  static const Color _darkBackground = Color(0xFF121212);
+  static const Color _lightBackground = Color(0xFFF5F5F5);
+  static const Color _darkSurface = Color(0xFF1E1E1E);
+  static const Color _lightSurface = Color(0xFFFFFFFF);
+  static const Color _darkText = Color(0xFFF5F5F5);
+  static const Color _lightText = Color(0xFF121212);
+  static const Color _darkSubText = Color(0xFFAAAAAA);
+  static const Color _lightSubText = Color(0xFF515151);
 
   @override
   void initState() {
@@ -66,14 +76,7 @@ class _RouteSelectionState extends State<RouteSelection> {
             _filteredRoutes = [];
             _isLoading = false;
           });
-          Fluttertoast.showToast(
-            msg: 'No routes available',
-            toastLength: Toast.LENGTH_SHORT,
-            gravity: ToastGravity.BOTTOM,
-            timeInSecForIosWeb: 1,
-            backgroundColor: Color(0xFFF5F5F5),
-            textColor: Color(0xFF121212),
-          );
+          _showToast('No routes available');
         }
         return;
       }
@@ -89,22 +92,25 @@ class _RouteSelectionState extends State<RouteSelection> {
       debugPrint("Error loading routes: $error");
       if (mounted) {
         setState(() => _isLoading = false);
-        Fluttertoast.showToast(
-          msg: 'Error loading routes: $error',
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          timeInSecForIosWeb: 1,
-          backgroundColor: Color(0xFFF5F5F5),
-          textColor: Color(0xFF121212),
-        );
+        _showToast('Error loading routes: $error');
       }
     }
   }
 
-  void _selectRoute(Map<String, dynamic> route) async {
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      timeInSecForIosWeb: 1,
+      backgroundColor: _lightBackground,
+      textColor: _lightText,
+    );
+  }
+
+  Future<void> _selectRoute(Map<String, dynamic> route) async {
     // Make sure the route has an ID field
     if (route['officialroute_id'] == null) {
-      // Try to get the ID from the database
       try {
         final routeDetails = await Supabase.instance.client
             .from('official_routes')
@@ -140,7 +146,6 @@ class _RouteSelectionState extends State<RouteSelection> {
 
       // Process intermediate coordinates
       if (route['intermediate_coordinates'] != null) {
-        // If it's a string, try to parse it as JSON
         if (route['intermediate_coordinates'] is String) {
           try {
             route['intermediate_coordinates'] =
@@ -150,7 +155,6 @@ class _RouteSelectionState extends State<RouteSelection> {
           }
         }
 
-        // Get polyline coordinates for the route using cache service
         try {
           final polylineCacheService = PolylineCacheService();
           final polylineCoordinates =
@@ -167,13 +171,14 @@ class _RouteSelectionState extends State<RouteSelection> {
     }
 
     // Show heavy traffic alert if density is high
-    if (route.containsKey('origin_coordinates') &&
+    if (mounted &&
+        route.containsKey('origin_coordinates') &&
         route.containsKey('destination_coordinates')) {
       final origin = route['origin_coordinates'] as LatLng;
       final destination = route['destination_coordinates'] as LatLng;
       final isHeavyTraffic =
           await TrafficService().isRouteUnderHeavyTraffic(origin, destination);
-      if (isHeavyTraffic) {
+      if (isHeavyTraffic && mounted) {
         await showDialog(
           context: context,
           barrierDismissible: false,
@@ -187,7 +192,9 @@ class _RouteSelectionState extends State<RouteSelection> {
     // Save the route for persistence
     await RouteService.saveRoute(route);
 
-    Navigator.pop(context, route);
+    if (mounted) {
+      Navigator.pop(context, route);
+    }
   }
 
   @override
@@ -201,125 +208,29 @@ class _RouteSelectionState extends State<RouteSelection> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: buildAppBar(isDarkMode),
-      backgroundColor:
-          isDarkMode ? const Color(0xFF121212) : const Color(0xFFF2F2F2),
-      body: Column(
-        children: [
-          Form(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: TextFormField(
-                controller: _searchController,
-                textInputAction: TextInputAction.search,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212),
-                ),
-                decoration: InputDecoration(
-                  fillColor: isDarkMode
-                      ? const Color(0xFF1E1E1E)
-                      : const Color(0xFFF5F5F5),
-                  filled: true,
-                  border: InputBorder.none,
-                  hintText: 'Search Route',
-                  hintStyle: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'Inter',
-                    color: isDarkMode
-                        ? const Color(0xFFAAAAAA)
-                        : const Color(0xFF515151),
-                  ),
-                  prefixIcon: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    margin: const EdgeInsets.only(right: 8), // Added margin
-                    child: Icon(
-                      Icons.route,
-                      size: 20,
-                      color: isDarkMode
-                          ? const Color(0xFFAAAAAA)
-                          : const Color(0xFF515151),
-                    ),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              color: const Color(0xFF00CC58),
-              onRefresh: _loadRoutes,
-              child: _isLoading
-                  ? Builder(
-                      builder: (context) {
-                        final screenWidth = MediaQuery.of(context).size.width;
-                        return ListSkeleton(
-                          itemCount: 10,
-                          screenWidth: screenWidth,
-                          itemPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
-                        );
-                      },
-                    )
-                  : ListView.builder(
-                      itemCount: _filteredRoutes.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Active Routes',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDarkMode
-                                        ? const Color(0xFFF5F5F5)
-                                        : const Color(0xFF121212),
-                                  ),
-                                ),
-                                Text(
-                                  '${_filteredRoutes.length}',
-                                  style: TextStyle(
-                                    fontFamily: 'Inter',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDarkMode
-                                        ? const Color(0xFFAAAAAA)
-                                        : const Color(0xFF515151),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        final route = _filteredRoutes[index - 1];
-                        return RouteSelectionWidget(
-                          routeName: route['route_name'] ?? 'Unknown Route',
-                          onTap: () => _selectRoute(route),
-                        );
-                      },
-                    ),
-            ),
-          ),
+      backgroundColor: isDarkMode ? _darkBackground : _lightBackground,
+      body: CustomScrollView(
+        slivers: [
+          _buildSliverAppBar(isDarkMode),
+          _buildSearchSliver(isDarkMode),
+          if (_isLoading)
+            SliverFillRemaining(
+              child: _buildLoadingState(context),
+            )
+          else if (_filteredRoutes.isEmpty)
+            SliverFillRemaining(
+              child: _buildEmptyState(isDarkMode),
+            )
+          else
+            _buildRouteList(isDarkMode),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () =>
             showTrafficInsightsSheet(context, _routes, _filteredRoutes),
-        icon: const Icon(Icons.traffic),
+        icon: const Icon(Icons.traffic_rounded),
         label: const Text(
-          'Traffic',
+          'Traffic Insights',
           style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w600,
@@ -329,54 +240,394 @@ class _RouteSelectionState extends State<RouteSelection> {
             isDarkMode ? const Color(0xFFFFCE21) : const Color(0xFF067837),
         foregroundColor:
             isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+        elevation: 4,
       ),
     );
   }
 
-  PreferredSizeWidget buildAppBar(bool isDarkMode) {
-    return AppBar(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-      elevation: 4,
+  Widget _buildSliverAppBar(bool isDarkMode) {
+    return SliverAppBar(
+      expandedHeight: 120.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: isDarkMode ? _darkBackground : _lightBackground,
+      elevation: 0,
       leading: Padding(
-        padding: const EdgeInsets.only(left: 17),
+        padding: const EdgeInsets.only(left: 16),
         child: CircleAvatar(
-          backgroundColor:
-              isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-          radius: 15,
-          child: Icon(
-            Icons.route,
-            size: 20,
-            color:
-                isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212),
+          backgroundColor: isDarkMode ? _darkSurface : _lightSurface,
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back,
+              color: isDarkMode ? _darkText : _lightText,
+            ),
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ),
       ),
-      title: Text(
-        'Select Route',
-        style: TextStyle(
-          color: isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212),
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          fontFamily: 'Inter',
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+        title: Text(
+          'Select Route',
+          style: TextStyle(
+            color: isDarkMode ? _darkText : _lightText,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
         ),
+        centerTitle: false,
       ),
       actions: [
-        CircleAvatar(
-          backgroundColor:
-              isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
-          child: IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(
-              Icons.close,
-              color: isDarkMode
-                  ? const Color(0xFFF5F5F5)
-                  : const Color(0xFF121212),
+        Padding(
+          padding: const EdgeInsets.only(right: 16),
+          child: CircleAvatar(
+            backgroundColor: isDarkMode ? _darkSurface : _lightSurface,
+            child: Icon(
+              Icons.map_outlined,
+              color: isDarkMode ? _darkText : _lightText,
             ),
           ),
         ),
-        const SizedBox(width: 16)
       ],
+    );
+  }
+
+  Widget _buildSearchSliver(bool isDarkMode) {
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _SliverSearchDelegate(
+        isDarkMode: isDarkMode,
+        controller: _searchController,
+      ),
+    );
+  }
+
+  Widget _buildRouteList(bool isDarkMode) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12, left: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Available Routes',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? _darkText : _lightText,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${_filteredRoutes.length} Active',
+                        style: const TextStyle(
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final route = _filteredRoutes[index - 1];
+            return _RouteCard(
+              route: route,
+              isDarkMode: isDarkMode,
+              onTap: () => _selectRoute(route),
+            );
+          },
+          childCount: _filteredRoutes.length + 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: ListSkeleton(
+        itemCount: 6,
+        screenWidth: screenWidth,
+        itemPadding: const EdgeInsets.symmetric(vertical: 8),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color:
+                isDarkMode ? const Color(0xFF333333) : const Color(0xFFCCCCCC),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No routes found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? _darkText : _lightText,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try searching for a different route',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? _darkSubText : _lightSubText,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliverSearchDelegate extends SliverPersistentHeaderDelegate {
+  final bool isDarkMode;
+  final TextEditingController controller;
+
+  _SliverSearchDelegate({
+    required this.isDarkMode,
+    required this.controller,
+  });
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: isDarkMode
+          ? const Color(0xFF121212)
+          : const Color(0xFFF5F5F5), // Match scaffold background
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: TextField(
+        controller: controller,
+        style: TextStyle(
+          fontFamily: 'Inter',
+          color: isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212),
+        ),
+        decoration: InputDecoration(
+          hintText: 'Search for a route...',
+          hintStyle: TextStyle(
+            fontFamily: 'Inter',
+            color:
+                isDarkMode ? const Color(0xFFAAAAAA) : const Color(0xFF515151),
+          ),
+          prefixIcon: Icon(
+            Icons.search,
+            color:
+                isDarkMode ? const Color(0xFFAAAAAA) : const Color(0xFF515151),
+          ),
+          filled: true,
+          fillColor:
+              isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+        ),
+      ),
+    );
+  }
+
+  @override
+  double get maxExtent => 70;
+
+  @override
+  double get minExtent => 70;
+
+  @override
+  bool shouldRebuild(_SliverSearchDelegate oldDelegate) {
+    return isDarkMode != oldDelegate.isDarkMode;
+  }
+}
+
+class _RouteCard extends StatelessWidget {
+  final Map<String, dynamic> route;
+  final bool isDarkMode;
+  final VoidCallback onTap;
+
+  const _RouteCard({
+    required this.route,
+    required this.isDarkMode,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00CC58).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.directions_bus_rounded,
+                        color: Color(0xFF00CC58),
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            route['route_name'] ?? 'Unnamed Route',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: isDarkMode
+                                  ? const Color(0xFFF5F5F5)
+                                  : const Color(0xFF121212),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            route['description'] ?? 'No description available',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 13,
+                              height: 1.4,
+                              color: isDarkMode
+                                  ? const Color(0xFFAAAAAA)
+                                  : const Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Color(0xFF00CC58),
+                    ),
+                  ],
+                ),
+                if (route['origin_name'] != null ||
+                    route['destination_name'] != null) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildLocationPill(
+                        context,
+                        route['origin_name'] ?? 'Origin',
+                        Icons.my_location_rounded,
+                        isDarkMode,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 14,
+                          color: isDarkMode
+                              ? const Color(0xFF555555)
+                              : const Color(0xFFAAAAAA),
+                        ),
+                      ),
+                      _buildLocationPill(
+                        context,
+                        route['destination_name'] ?? 'Destination',
+                        Icons.location_on_rounded,
+                        isDarkMode,
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationPill(
+      BuildContext context, String text, IconData icon, bool isDarkMode) {
+    return Expanded(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: isDarkMode
+                ? const Color(0xFF00CC58)
+                : const Color(
+                    0xFF00883A), // Slightly darker green for light mode
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDarkMode
+                    ? const Color(0xFFCCCCCC)
+                    : const Color(0xFF555555),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
