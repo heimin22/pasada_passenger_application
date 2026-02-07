@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pasada_passenger_app/services/authService.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:pasada_passenger_app/screens/authenticationCodePasswordScreen.dart';
+import 'package:pasada_passenger_app/services/authService.dart';
 
 class ChangeForgottenPassword extends StatefulWidget {
   const ChangeForgottenPassword({super.key});
@@ -49,24 +49,24 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
     final email = _emailController.text.trim().toLowerCase();
 
     if (email.isEmpty) {
-        Fluttertoast.showToast(
-          msg: "Please enter your email",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.CENTER,
-          backgroundColor: const Color(0xFF121212),
-          textColor: const Color(0xFFF5F5F5),
-        );
+      Fluttertoast.showToast(
+        msg: "Please enter your email",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.CENTER,
+        backgroundColor: const Color(0xFF121212),
+        textColor: const Color(0xFFF5F5F5),
+      );
       return;
     }
 
     if (!_canResend) {
-        Fluttertoast.showToast(
-          msg: "Please wait $_remainingTime seconds before requesting again",
-          toastLength: Toast.LENGTH_SHORT,
-          gravity: ToastGravity.BOTTOM,
-          backgroundColor: const Color(0xFF121212),
-          textColor: const Color(0xFFF5F5F5),
-        );
+      Fluttertoast.showToast(
+        msg: "Please wait $_remainingTime seconds before requesting again",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: const Color(0xFF121212),
+        textColor: const Color(0xFFF5F5F5),
+      );
       return;
     }
 
@@ -130,10 +130,13 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5);
-    final textColor = isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212);
-    final borderColor = isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFF121212);
-    
+    final backgroundColor =
+        isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5);
+    final textColor =
+        isDarkMode ? const Color(0xFFF5F5F5) : const Color(0xFF121212);
+    final borderColor =
+        isDarkMode ? const Color(0xFF3A3A3A) : const Color(0xFF121212);
+
     Widget timerWidget = _canResend
         ? const SizedBox.shrink()
         : Text(
@@ -187,12 +190,14 @@ class ChangeForgottenPasswordState extends State<ChangeForgottenPassword> {
                 hintText: "Email",
                 hintStyle: TextStyle(
                   fontSize: 14,
-                  color: textColor.withOpacity(0.6),
+                  color: textColor.withValues(alpha: 0.6),
                   fontWeight: FontWeight.w500,
                   fontFamily: 'Inter',
                 ),
                 filled: true,
-                fillColor: isDarkMode ? const Color(0xFF1E1E1E) : const Color(0xFFF5F5F5),
+                fillColor: isDarkMode
+                    ? const Color(0xFF1E1E1E)
+                    : const Color(0xFFF5F5F5),
                 border: OutlineInputBorder(
                   borderSide: BorderSide(color: borderColor),
                   borderRadius: const BorderRadius.all(Radius.circular(8)),
