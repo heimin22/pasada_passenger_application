@@ -50,7 +50,7 @@ dependencies:
   flutter_google_maps_webservices: ^1.1.1
   flutter_image_compress: ^2.4.0
   flutter_isolate: ^2.1.0
-  flutter_local_notifications: ^19.1.0
+  flutter_local_notifications: ^20.0.0
   flutter_markdown: ^0.7.7
   flutter_native_splash: ^2.4.6
   flutter_polyline_points: ^3.0.1

@@ -56,7 +56,7 @@ class NotificationService {
       );
 
       await _flutterLocalNotificationsPlugin.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           debugPrint('Notification clicked with payload: ${response.payload}');
           _handleNotificationTap();
@@ -137,7 +137,7 @@ class NotificationService {
       );
 
       await _flutterLocalNotificationsPlugin.initialize(
-        initializationSettings,
+        settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           // quiet
           _handleNotificationTap();
@@ -341,10 +341,10 @@ class NotificationService {
       );
 
       await _flutterLocalNotificationsPlugin.show(
-        0,
-        title,
-        body,
-        platformChannelSpecifics,
+        id: 0,
+        title: title,
+        body: body,
+        notificationDetails: platformChannelSpecifics,
         payload: payload,
       );
     } catch (e) {
@@ -430,7 +430,7 @@ class NotificationService {
   }
 
   static Future<void> cancelNotification(int id) async {
-    await _flutterLocalNotificationsPlugin.cancel(id);
+    await _flutterLocalNotificationsPlugin.cancel(id: id);
   }
 
   static Future<bool> checkPermissions() async {
@@ -598,16 +598,17 @@ class NotificationService {
       android: androidDetails,
     );
     await _flutterLocalNotificationsPlugin.show(
-      rideProgressNotificationId,
-      title,
-      '$progress% to drop-off',
-      platformDetails,
+      id: rideProgressNotificationId,
+      title: title,
+      body: '$progress% to drop-off',
+      notificationDetails: platformDetails,
     );
   }
 
   /// Cancels the ride progress notification.
   static Future<void> cancelRideProgressNotification() async {
-    await _flutterLocalNotificationsPlugin.cancel(rideProgressNotificationId);
+    await _flutterLocalNotificationsPlugin.cancel(
+        id: rideProgressNotificationId);
   }
 
   /// Gets a random dialogue message when a driver is found

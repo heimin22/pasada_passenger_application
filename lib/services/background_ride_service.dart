@@ -269,17 +269,17 @@ class BackgroundRideService {
     );
 
     await flutterLocalNotificationsPlugin.show(
-      _notificationId,
-      title,
-      body,
-      details,
+      id: _notificationId,
+      title: title,
+      body: body,
+      notificationDetails: details,
     );
   }
 
   /// Cancel the service notification
   static Future<void> _cancelServiceNotification() async {
     final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-    await flutterLocalNotificationsPlugin.cancel(_notificationId);
+    await flutterLocalNotificationsPlugin.cancel(id: _notificationId);
   }
 
   /// Request necessary permissions
