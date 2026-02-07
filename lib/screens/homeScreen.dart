@@ -84,10 +84,7 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<WeatherProvider>(
-      create: (_) => WeatherProvider(),
-      child: const HomeScreenStateful(),
-    );
+    return const HomeScreenStateful();
   }
 }
 
@@ -1044,7 +1041,8 @@ class HomeScreenPageState extends State<HomeScreenStateful>
                     phoneNumber: phoneNumber,
                     isDriverAssigned: isDriverAssigned,
                     currentLocation: mapScreenKey.currentState?.currentLocation,
-                    driverLocation: (mapScreenKey.currentState as dynamic)?.driverLocation,
+                    driverLocation:
+                        (mapScreenKey.currentState as dynamic)?.driverLocation,
                     bookingId: activeBookingId,
                     selectedDiscount:
                         selectedDiscountSpecification.value.isNotEmpty &&
