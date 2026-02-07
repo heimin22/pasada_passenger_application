@@ -16,81 +16,84 @@ class ActivityScreen extends StatefulWidget {
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return const ActivityScreenStateful();
-  }
-}
+  // State
+  List<Map<String, dynamic>> _bookings = [];
+  bool _isLoading = true;
+  bool _isSynced = true;
+  Timer? _refreshTimer;
 
-class ActivityScreenStateful extends StatefulWidget {
-  const ActivityScreenStateful({super.key});
-
-  @override
-  State<ActivityScreenStateful> createState() => ActivityScreenPageState();
-}
-
-class ActivityScreenPageState extends State<ActivityScreenStateful> {
-  Timer? _debounceTimer;
-  List<Map<String, dynamic>> bookings = [];
-  bool isLoading = true;
-  bool isSynced = true;
+  // Design Constants
+  static const Color _primaryColor = Color(0xFF00CC58);
+  static const Color _darkBackground = Color(0xFF121212);
+  static const Color _lightBackground = Color(0xFFF5F5F5);
+  static const Color _darkSurface = Color(0xFF1E1E1E);
+  static const Color _lightSurface = Color(0xFFFFFFFF);
+  static const Color _darkText = Color(0xFFF5F5F5);
+  static const Color _lightText = Color(0xFF121212);
+  static const Color _darkSubText = Color(0xFFAAAAAA);
+  static const Color _lightSubText = Color(0xFF515151);
 
   @override
   void initState() {
     super.initState();
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 2), fetchBookings);
+    _fetchBookings();
   }
 
   @override
   void dispose() {
-    _debounceTimer?.cancel();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> fetchBookings() async {
+  Future<void> _fetchBookings() async {
+    if (!mounted) return;
+
+    // Only show full loading if we have no data yet
+    if (_bookings.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+
+    setState(() => _isSynced = false);
+
     try {
-      setState(() {
-        // mark as syncing; UI may show indicator accordingly
-        isSynced = false;
-        isLoading = true;
-      });
       final currentUser = Supabase.instance.client.auth.currentUser;
       if (currentUser == null) {
         debugPrint('No user logged in');
-        setState(() {
-          bookings = [];
-          isLoading = false;
-          isSynced = true;
-        });
+        if (mounted) {
+          setState(() {
+            _bookings = [];
+            _isLoading = false;
+            _isSynced = true;
+          });
+        }
         return;
       }
 
+      // Optimized query: Filter by status on the server side
+      // Using .or filter for ride_status as .in_ is not available
       final response = await Supabase.instance.client
           .from('bookings')
           .select()
           .eq('passenger_id', currentUser.id)
-          .order('created_at', ascending: false);
+          .or('ride_status.eq.completed,ride_status.eq.accepted,ride_status.eq.ongoing')
+          .order('created_at', ascending: false)
+          .limit(20); // Limit to 20 for better initial load performance
 
-      setState(() {
-        final allBookings = List<Map<String, dynamic>>.from(response);
-        final filteredBookings = allBookings.where((booking) {
-          final status = booking['ride_status'] as String?;
-          return status != null &&
-              (status == 'completed' ||
-                  status == 'accepted' ||
-                  status == 'ongoing');
-        }).toList();
-        bookings = filteredBookings.take(10).toList();
-        isLoading = false;
-        isSynced = true;
-      });
+      if (mounted) {
+        setState(() {
+          _bookings = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+          _isSynced = true;
+        });
+      }
     } catch (e) {
       debugPrint('Error fetching bookings: $e');
-      setState(() {
-        isLoading = false;
-        isSynced = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isSynced = false;
+        });
+      }
     }
   }
 
@@ -106,122 +109,194 @@ class ActivityScreenPageState extends State<ActivityScreenStateful> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Set system UI overlay style
     SystemChrome.setSystemUIOverlayStyle(
       SystemUiOverlayStyle(
         systemNavigationBarColor:
-            isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+            isDarkMode ? _darkBackground : _lightBackground,
         systemNavigationBarIconBrightness:
             isDarkMode ? Brightness.light : Brightness.dark,
+        statusBarColor: Colors.transparent,
       ),
     );
-    final connectivityService = OfflineConnectionCheckService();
 
     return Scaffold(
-      backgroundColor:
-          isDarkMode ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
+      backgroundColor: isDarkMode ? _darkBackground : _lightBackground,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                'Activity',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212),
+        child: RefreshIndicator(
+          onRefresh: _fetchBookings,
+          color: _primaryColor,
+          backgroundColor: isDarkMode ? _darkSurface : _lightSurface,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              _buildSliverAppBar(isDarkMode),
+              SliverToBoxAdapter(
+                child: _buildConnectivityBanner(isDarkMode),
+              ),
+              if (_isLoading)
+                SliverFillRemaining(
+                  child: _buildLoadingState(context),
+                )
+              else if (_bookings.isEmpty)
+                SliverFillRemaining(
+                  child: _buildEmptyState(isDarkMode),
+                )
+              else
+                _buildBookingList(isDarkMode),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSliverAppBar(bool isDarkMode) {
+    return SliverAppBar(
+      expandedHeight: 100.0,
+      floating: false,
+      pinned: true,
+      backgroundColor: isDarkMode ? _darkBackground : _lightBackground,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+        title: Text(
+          'Activity',
+          style: TextStyle(
+            color: isDarkMode ? _darkText : _lightText,
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
+        ),
+        centerTitle: false,
+      ),
+    );
+  }
+
+  Widget _buildConnectivityBanner(bool isDarkMode) {
+    final connectivityService = OfflineConnectionCheckService();
+    return StreamBuilder<bool>(
+      stream: connectivityService.connectionStream,
+      initialData: connectivityService.isConnected,
+      builder: (context, snapshot) {
+        final online = snapshot.data ?? true;
+        final showBanner = !online || !_isSynced;
+
+        if (!showBanner) return const SizedBox.shrink();
+
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFD7481D).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+                color: const Color(0xFFD7481D).withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_off_rounded,
+                  color: Color(0xFFD7481D), size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  online
+                      ? 'Data may be out of date. Pull to refresh.'
+                      : 'You are offline. Showing last known data.',
+                  style: TextStyle(
+                    color: isDarkMode ? _darkText : _lightText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'Inter',
+                  ),
                 ),
               ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBookingList(bool isDarkMode) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final booking = _bookings[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: GestureDetector(
+                onTap: () => _viewBookingDetails(booking),
+                child: BookingListItem(booking: booking),
+              ),
+            );
+          },
+          childCount: _bookings.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: ListSkeleton(
+        itemCount: 6,
+        screenWidth: screenWidth,
+        itemPadding: const EdgeInsets.symmetric(vertical: 8),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: _primaryColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
             ),
-            // Not synced / offline indicator
-            StreamBuilder<bool>(
-              stream: connectivityService.connectionStream,
-              initialData: connectivityService.isConnected,
-              builder: (context, snapshot) {
-                final online = snapshot.data ?? true;
-                final showBanner = !online || !isSynced;
-                if (!showBanner) return const SizedBox.shrink();
-                return Container(
-                  width: double.infinity,
-                  color: const Color(0x33D7481D),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.sync_problem,
-                          color: Color(0xFFD7481D), size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          online
-                              ? 'Data may be out of date. Pull to refresh.'
-                              : 'Offline. Showing last known data.',
-                          style: TextStyle(
-                            color: isDarkMode
-                                ? const Color(0xFFF5F5F5)
-                                : const Color(0xFF121212),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+            child: const Icon(
+              Icons.history_rounded,
+              size: 48,
+              color: _primaryColor,
             ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: fetchBookings,
-                color: const Color(0xFF067837),
-                child: isLoading
-                    ? Builder(
-                        builder: (context) {
-                          final screenWidth = MediaQuery.of(context).size.width;
-                          return ListSkeleton(
-                            itemCount: 6,
-                            screenWidth: screenWidth,
-                          );
-                        },
-                      )
-                    : bookings.isEmpty
-                        ? ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            children: [
-                              const SizedBox(height: 120),
-                              Center(
-                                child: Text(
-                                  'Empty history mo, boss. Try mo naman magbook!',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    fontFamily: 'Inter',
-                                    color: isDarkMode
-                                        ? const Color(0xFFF5F5F5)
-                                        : const Color(0xFF121212),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : ListView.builder(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            itemCount: bookings.length,
-                            itemBuilder: (context, index) {
-                              final booking = bookings[index];
-                              return GestureDetector(
-                                onTap: () => _viewBookingDetails(booking),
-                                child: BookingListItem(booking: booking),
-                              );
-                            },
-                          ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'No Recent Activity',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: isDarkMode ? _darkText : _lightText,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Your completed and ongoing rides will appear here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? _darkSubText : _lightSubText,
+                fontFamily: 'Inter',
+                height: 1.5,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
