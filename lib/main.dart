@@ -9,6 +9,7 @@ import 'package:pasada_passenger_app/authentication/authGate.dart';
 import 'package:pasada_passenger_app/authentication/createAccount.dart';
 import 'package:pasada_passenger_app/authentication/createAccountCred.dart';
 import 'package:pasada_passenger_app/authentication/loginAccount.dart';
+import 'package:pasada_passenger_app/providers/weather_provider.dart';
 import 'package:pasada_passenger_app/screens/introductionScreen.dart';
 import 'package:pasada_passenger_app/services/background_ride_service.dart';
 import 'package:pasada_passenger_app/services/lazy_initialization_service.dart';
@@ -17,6 +18,7 @@ import 'package:pasada_passenger_app/services/performance_monitoring_service.dar
 import 'package:pasada_passenger_app/services/slow_internet_warning_service.dart';
 import 'package:pasada_passenger_app/theme/theme_controller.dart';
 import 'package:pasada_passenger_app/utils/adaptive_memory_manager.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -366,68 +368,73 @@ class _PasadaPassengerState extends State<PasadaPassenger> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _themeController,
-      builder: (context, child) {
-        return MaterialApp(
-          navigatorKey: navigatorKey,
-          title: 'Pasada',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            scaffoldBackgroundColor: _themeController.isDarkMode
-                ? const Color(0xFF121212)
-                : const Color(0xFFF5F5F5),
-            fontFamily: 'Inter',
-            useMaterial3: true,
-            brightness: _themeController.isDarkMode
-                ? Brightness.dark
-                : Brightness.light,
-            textTheme: TextTheme(
-              bodyLarge: TextStyle(
-                  color: _themeController.isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212)),
-              bodyMedium: TextStyle(
-                  color: _themeController.isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212)),
-              bodySmall: TextStyle(
-                  color: _themeController.isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212)),
-              // Ensure TextField text uses proper color in light mode
-              titleMedium: TextStyle(
-                  color: _themeController.isDarkMode
-                      ? const Color(0xFFF5F5F5)
-                      : const Color(0xFF121212)),
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: _themeController.isDarkMode
-                  ? const Color(0xFF1E1E1E)
-                  : const Color(0xFFF5F5F5),
-            ),
-          ),
-          // screens: const PasadaHomePage(title: 'Pasada'),
-          home: const AuthGate(),
-          routes: <String, WidgetBuilder>{
-            'introduction': (BuildContext context) =>
-                const IntroductionScreen(),
-            'createAccount': (BuildContext context) =>
-                const CreateAccountPage(),
-            'cred': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-              return CreateAccountCredPage(
-                title: 'Create Account',
-                email: args['email'],
-              );
-            },
-            'loginAccount': (BuildContext context) => const LoginAccountPage(),
+    return MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => WeatherProvider()),
+        ],
+        child: ListenableBuilder(
+          listenable: _themeController,
+          builder: (context, child) {
+            return MaterialApp(
+              navigatorKey: navigatorKey,
+              title: 'Pasada',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                scaffoldBackgroundColor: _themeController.isDarkMode
+                    ? const Color(0xFF121212)
+                    : const Color(0xFFF5F5F5),
+                fontFamily: 'Inter',
+                useMaterial3: true,
+                brightness: _themeController.isDarkMode
+                    ? Brightness.dark
+                    : Brightness.light,
+                textTheme: TextTheme(
+                  bodyLarge: TextStyle(
+                      color: _themeController.isDarkMode
+                          ? const Color(0xFFF5F5F5)
+                          : const Color(0xFF121212)),
+                  bodyMedium: TextStyle(
+                      color: _themeController.isDarkMode
+                          ? const Color(0xFFF5F5F5)
+                          : const Color(0xFF121212)),
+                  bodySmall: TextStyle(
+                      color: _themeController.isDarkMode
+                          ? const Color(0xFFF5F5F5)
+                          : const Color(0xFF121212)),
+                  // Ensure TextField text uses proper color in light mode
+                  titleMedium: TextStyle(
+                      color: _themeController.isDarkMode
+                          ? const Color(0xFFF5F5F5)
+                          : const Color(0xFF121212)),
+                ),
+                inputDecorationTheme: InputDecorationTheme(
+                  filled: true,
+                  fillColor: _themeController.isDarkMode
+                      ? const Color(0xFF1E1E1E)
+                      : const Color(0xFFF5F5F5),
+                ),
+              ),
+              // screens: const PasadaHomePage(title: 'Pasada'),
+              home: const AuthGate(),
+              routes: <String, WidgetBuilder>{
+                'introduction': (BuildContext context) =>
+                    const IntroductionScreen(),
+                'createAccount': (BuildContext context) =>
+                    const CreateAccountPage(),
+                'cred': (context) {
+                  final args = ModalRoute.of(context)!.settings.arguments
+                      as Map<String, dynamic>;
+                  return CreateAccountCredPage(
+                    title: 'Create Account',
+                    email: args['email'],
+                  );
+                },
+                'loginAccount': (BuildContext context) =>
+                    const LoginAccountPage(),
+              },
+            );
           },
-        );
-      },
-    );
+        ));
   }
 }
 

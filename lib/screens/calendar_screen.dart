@@ -1,5 +1,13 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:pasada_passenger_app/providers/weather_provider.dart';
 import 'package:pasada_passenger_app/services/calendar_service.dart';
+import 'package:pasada_passenger_app/services/location_weather_service.dart';
+import 'package:pasada_passenger_app/services/weather_service.dart';
+import 'package:provider/provider.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -15,11 +23,45 @@ class _CalendarScreenState extends State<CalendarScreen> {
   String? _holidayName;
   Map<DateTime, String> _holidayByDate = {};
 
+  // New state variables
+  late Timer _timer;
+  DateTime _currentTime = DateTime.now();
+
   @override
   void initState() {
     super.initState();
     _checkHolidayStatus();
     _loadVisibleRangeHolidays();
+
+    // Start timer for time display
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
+    });
+
+    // Initialize weather if needed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initWeather();
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initWeather() async {
+    final weatherProv = Provider.of<WeatherProvider>(context, listen: false);
+    if (weatherProv.weather == null) {
+      final initialized = await weatherProv.initializeWeatherService();
+      if (!initialized) {
+        await LocationWeatherService.refreshWeatherNow(weatherProv);
+      }
+    }
   }
 
   Future<void> _checkHolidayStatus() async {
@@ -99,6 +141,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Time Display
+            _buildTimeDisplay(isDarkMode),
+            const SizedBox(height: 24),
+
+            // Weather & Commute
+            _buildWeatherSection(isDarkMode),
+            const SizedBox(height: 24),
+
             // Calendar Widget
             Container(
               decoration: BoxDecoration(
@@ -643,6 +693,308 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeDisplay(bool isDarkMode) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isDarkMode ? const Color(0xFF2A2A2A) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            DateFormat('hh:mm a').format(_currentTime),
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF00CC58),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            DateFormat('EEEE, MMMM d, y').format(_currentTime),
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: 14,
+              color: isDarkMode
+                  ? const Color(0xFF999999)
+                  : const Color(0xFF666666),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherSection(bool isDarkMode) {
+    return Consumer<WeatherProvider>(
+      builder: (context, weatherProv, child) {
+        final weather = weatherProv.weather;
+
+        if (weatherProv.isLoading && weather == null) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(color: Color(0xFF00CC58)),
+            ),
+          );
+        }
+
+        if (weatherProv.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                children: [
+                  Icon(Icons.cloud_off,
+                      color: isDarkMode ? Colors.grey : Colors.grey[600],
+                      size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    weatherProv.error ?? "Failed to load weather",
+                    style: TextStyle(
+                        color: isDarkMode ? Colors.grey : Colors.grey[600]),
+                  ),
+                  TextButton.icon(
+                    onPressed: weatherProv.retryFetch,
+                    icon: const Icon(Icons.refresh, color: Color(0xFF00CC58)),
+                    label: Text("Retry",
+                        style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black)),
+                  )
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (weather == null) {
+          // If manual refresh needed or not initialized
+          return Center(
+              child: TextButton.icon(
+            onPressed: () =>
+                LocationWeatherService.refreshWeatherNow(weatherProv),
+            icon: const Icon(Icons.cloud_download, color: Color(0xFF00CC58)),
+            label: Text("Load Weather",
+                style:
+                    TextStyle(color: isDarkMode ? Colors.white : Colors.black)),
+          ));
+        }
+
+        return Column(
+          children: [
+            // Commute Message
+            _buildCommuteMessage(isDarkMode, weather),
+            const SizedBox(height: 16),
+
+            // Current Weather + Forecast
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDarkMode
+                    ? const Color(0xFF1A1A1A)
+                    : const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDarkMode
+                      ? const Color(0xFF2A2A2A)
+                      : const Color(0xFFE0E0E0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: weather.iconUrl,
+                        width: 48,
+                        height: 48,
+                        placeholder: (context, url) => Container(),
+                        errorWidget: (context, url, error) =>
+                            const Icon(Icons.cloud_off),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${weather.tempC.round()}°C',
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode
+                                  ? const Color(0xFFF5F5F5)
+                                  : const Color(0xFF121212),
+                            ),
+                          ),
+                          Text(
+                            weather.condition,
+                            style: TextStyle(
+                              fontFamily: 'Inter',
+                              fontSize: 14,
+                              color: isDarkMode
+                                  ? const Color(0xFF999999)
+                                  : const Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  if (weather.forecast.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
+                    Text(
+                      '3-Day Forecast',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode
+                            ? const Color(0xFF999999)
+                            : const Color(0xFF666666),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: weather.forecast.take(3).map((day) {
+                        return Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                DateFormat('E').format(day.date),
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: isDarkMode
+                                      ? const Color(0xFF999999)
+                                      : const Color(0xFF666666),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              CachedNetworkImage(
+                                imageUrl: day.iconUrl,
+                                width: 32,
+                                height: 32,
+                                placeholder: (context, url) =>
+                                    SizedBox(width: 32, height: 32),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(Icons.error, size: 20),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${day.maxTempC.round()}°',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode
+                                      ? const Color(0xFFF5F5F5)
+                                      : const Color(0xFF121212),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCommuteMessage(bool isDarkMode, Weather weather) {
+    String message;
+    Color color;
+    IconData icon;
+    Color iconColor;
+    Color bgColor;
+
+    bool isBadWeather = weather.isRaining ||
+        weather.condition.toLowerCase().contains('storm') ||
+        weather.condition.toLowerCase().contains('thunder');
+
+    if (isBadWeather) {
+      if (weather.condition.toLowerCase().contains('heavy') ||
+          weather.condition.toLowerCase().contains('storm')) {
+        message = "Commuting might be difficult right now due to heavy rain.";
+        color = Colors.redAccent;
+        icon = Icons.warning_amber_rounded;
+        bgColor = Colors.redAccent.withValues(alpha: 0.1);
+        iconColor = Colors.redAccent;
+      } else {
+        message = "Bring an umbrella! It's raining.";
+        color = Colors.orangeAccent;
+        icon = Icons.umbrella;
+        bgColor = Colors.orangeAccent.withValues(alpha: 0.1);
+        iconColor = Colors.orangeAccent;
+      }
+    } else {
+      message = "Good time to commute right now.";
+      color = const Color(0xFF00CC58);
+      icon = Icons.check_circle_outline;
+      bgColor = const Color(0xFF00CC58).withValues(alpha: 0.1);
+      iconColor = const Color(0xFF00CC58);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDarkMode
+            ? const Color(0xFF1E1E1E)
+            : bgColor, // Dark mode overrides colored bg for subtlety
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDarkMode
+              ? color.withValues(alpha: 0.5)
+              : color.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode
+                    ? const Color(0xFFF5F5F5)
+                    : const Color(0xFF121212),
+              ),
             ),
           ),
         ],
