@@ -23,11 +23,21 @@ class ApiService {
     return _instance;
   }
 
-  ApiService._internal() : baseUrl = dotenv.env['API_URL'] ?? '' {
+  ApiService._internal()
+      : baseUrl =
+            _resolveBaseUrl(dotenv.env['BACKEND_URL'], dotenv.env['API_URL']) {
     AppLogger.info('API URL configured as: $baseUrl', tag: 'ApiService');
     if (baseUrl.isEmpty) {
       AppLogger.warn('API_URL is empty in .env file', tag: 'ApiService');
     }
+  }
+
+  static String _resolveBaseUrl(String? backendUrl, String? apiUrl) {
+    final backend = backendUrl?.trim();
+    if (backend != null && backend.isNotEmpty) {
+      return backend;
+    }
+    return apiUrl ?? '';
   }
 
   final supabase = Supabase.instance.client;
